@@ -29,6 +29,7 @@ async function main() {
         const skipUnpack = core.getBooleanInput("skip_unpack")
         const ifNoArtifactFound = core.getInput("if_no_artifact_found")
         let workflow = core.getInput("workflow")
+        let workflow_id = core.getInput("workflow_id")
         let workflowConclusion = core.getInput("workflow_conclusion")
         let pr = core.getInput("pr")
         let commit = core.getInput("commit")
@@ -46,16 +47,17 @@ async function main() {
         core.info(`==> Artifact name: ${name}`)
         core.info(`==> Local path: ${path}`)
 
-        if (!workflow) {
+        if (!workflow && !workflow_id) {
             const run = await client.rest.actions.getWorkflowRun({
                 owner: owner,
                 repo: repo,
                 run_id: runID || github.context.runId,
             })
-            workflow = run.data.workflow_id
+            workflow_id = run.data.workflow_id
         }
 
         core.info(`==> Workflow name: ${workflow}`)
+        core.info(`==> Workflow Id: ${workflow_id}`)
         core.info(`==> Workflow conclusion: ${workflowConclusion}`)
 
         const uniqueInputSets = [
@@ -64,6 +66,10 @@ async function main() {
                 "commit": commit,
                 "branch": branch,
                 "run_id": runID
+            },
+            {
+                "workflow": workflow,
+                "workflow_id": workflow_id
             }
         ]
         uniqueInputSets.forEach((inputSet) => {
@@ -107,7 +113,8 @@ async function main() {
             for await (const runs of client.paginate.iterator(client.rest.actions.listWorkflowRuns, {
                 owner: owner,
                 repo: repo,
-                workflow_id: workflow,
+                ...(workflow_id ? { workflow_id } : {}),
+                ...(workflow ? { name: workflow } : {}),
                 ...(branch ? { branch } : {}),
                 ...(event ? { event } : {}),
                 ...(commit ? { head_sha: commit } : {}),
