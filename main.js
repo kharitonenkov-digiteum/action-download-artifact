@@ -110,21 +110,34 @@ async function main() {
 
         if (!runID) {
             // Note that the runs are returned in most recent first order.
-            for await (const runs of client.paginate.iterator(client.rest.actions.listWorkflowRuns, {
+            //we should use different uls in case exist workflow_id of workflow name
+            let requestIterator = workflow_id? client.paginate.iterator(client.rest.actions.listWorkflowRuns, {
                 owner: owner,
                 repo: repo,
                 ...(workflow_id ? { workflow_id } : {}),
-                ...(workflow ? { name: workflow } : {}),
                 ...(branch ? { branch } : {}),
                 ...(event ? { event } : {}),
                 ...(commit ? { head_sha: commit } : {}),
             }
-            )) {
+            )
+            :
+            client.paginate.iterator(client.rest.actions.listWorkflowRunsForRepo, {
+                owner: owner,
+                repo: repo,
+                ...(branch ? { branch } : {}),
+                ...(event ? { event } : {}),
+                ...(commit ? { head_sha: commit } : {}),
+            }
+            )
+            for await (const runs of requestIterator) {
                 for (const run of runs.data) {
                     if (runNumber && run.run_number != runNumber) {
                         continue
                     }
                     if (workflowConclusion && (workflowConclusion != run.conclusion && workflowConclusion != run.status)) {
+                        continue
+                    }
+                    if (workflow && run.name != workflow){
                         continue
                     }
                     if (checkArtifacts || searchArtifacts) {
